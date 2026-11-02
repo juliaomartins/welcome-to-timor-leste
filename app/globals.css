@@ -1,26 +1,664 @@
 @import "tailwindcss";
 
+/* Palette drawn from the place: the Wetar Strait at dawn, the copper patina of
+   Cristo Rei, and the red, yellow and black of the national flag and tais cloth. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --sea-deep: #0c2a33;
+  --sea-night: #071a20;
+  --patina: #6fb3a8;
+  --tais-red: #c8322a;
+  --sun: #f6b93b;
+  --foam: #f4efe6;
+  --ink: #15120f;
+
+  --text: color-mix(in oklab, var(--foam) 94%, transparent);
+  --text-soft: color-mix(in oklab, var(--foam) 76%, transparent);
+  --rule: color-mix(in oklab, var(--foam) 20%, transparent);
+
+  /* Modular scale, ratio 1.25 (major third). */
+  --step--1: 0.8rem;
+  --step-0: 1.0625rem;
+  --step-1: 1.33rem;
+  --step-2: 1.66rem;
+  --step-3: 2.07rem;
+  --step-4: 2.6rem;
+  --step-5: 3.24rem;
+  --step-6: 4.05rem;
+
+  --gutter: clamp(1rem, 5vw, 5rem);
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html {
+  background: var(--sea-night);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html.is-intro,
+html.is-intro body {
+  overflow: hidden;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--sea-night);
+  color: var(--text);
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sun);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+em {
+  font-style: italic;
+  color: var(--foam);
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in oklab, var(--sun) 70%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--sun);
+}
+
+/* ---------- 3D stage ---------- */
+
+.experience {
+  position: relative;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100lvh;
+  display: block;
+  z-index: 0;
+}
+
+.stage-fallback {
+  position: fixed;
+  inset: auto var(--gutter) 2rem;
+  z-index: 2;
+  font-size: var(--step--1);
+  color: var(--text-soft);
+}
+
+.journey {
+  position: relative;
+  z-index: 1;
+}
+
+/* The sun climbs this rail as you scroll: a reading-progress marker that is
+   also the sunrise. */
+.sunrise-dial {
+  position: fixed;
+  right: clamp(0.75rem, 2vw, 1.75rem);
+  top: 30vh;
+  height: 40vh;
+  width: 1px;
+  background: linear-gradient(to top, color-mix(in oklab, var(--foam) 8%, transparent), var(--rule));
+  z-index: 3;
+  pointer-events: none;
+}
+
+.sunrise-dial-sun {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff3d1 0 35%, var(--sun) 60%, #f0862c 100%);
+  box-shadow: 0 0 16px 4px color-mix(in oklab, var(--sun) 55%, transparent);
+  transform: translateY(calc((1 - var(--journey, 0)) * 40vh - 5.5px));
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 var(--gutter) clamp(2rem, 7vh, 4.5rem);
+}
+
+.hero-copy {
+  max-width: 40rem;
+}
+
+.hero-title {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: clamp(2.3rem, 4.4vw, 3.9rem);
+  line-height: 1;
+  letter-spacing: -0.012em;
+  color: var(--foam);
+  text-shadow: 0 2px 30px rgb(7 26 32 / 0.45);
+}
+
+.hero-lede {
+  margin: 1.25rem 0 0;
+  max-width: 30rem;
+  font-size: var(--step-1);
+  line-height: 1.45;
+  color: var(--text);
+  text-shadow: 0 1px 18px rgb(7 26 32 / 0.6);
+}
+
+.hero-cue {
+  position: absolute;
+  right: var(--gutter);
+  bottom: clamp(2rem, 7vh, 4.5rem);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: var(--step--1);
+  color: var(--text-soft);
+}
+
+.hero-cue::after {
+  content: "";
+  width: 1px;
+  height: 3rem;
+  background: linear-gradient(var(--foam), transparent);
+  animation: cue 2.4s ease-in-out infinite;
+  transform-origin: top;
+}
+
+@keyframes cue {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* ---------- Chapters ---------- */
+
+.chapter {
+  position: relative;
+  min-height: 150vh;
+  display: flex;
+  align-items: center;
+  padding: 30vh var(--gutter);
+}
+
+.chapter--long {
+  min-height: 180vh;
+}
+
+.chapter--right {
+  justify-content: flex-end;
+}
+
+.chapter-body {
+  position: relative;
+  max-width: 34rem;
+}
+
+/* A soft pool of shade behind the words, so they read against any sky
+   without boxing the scene into cards. */
+.chapter-body::before {
+  content: "";
+  position: absolute;
+  inset: -7rem -9rem;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgb(7 26 32 / 0.66), rgb(7 26 32 / 0.38) 60%, transparent);
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+.chapter h2,
+.closing h2 {
+  margin: 0 0 1.5rem;
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: clamp(var(--step-4), 4.4vw, var(--step-6));
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  color: var(--foam);
+  text-wrap: balance;
+}
+
+.chapter p {
+  margin: 0 0 1.1rem;
+  max-width: 62ch;
+  text-wrap: pretty;
+}
+
+.chapter-lede {
+  font-size: var(--step-1);
+  line-height: 1.45;
+  color: var(--foam);
+}
+
+/* Official names */
+.names {
+  margin: 2rem 0 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.names > div {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+}
+
+.names dt,
+.glance dt {
+  color: var(--sun);
+  font-size: var(--step--1);
+  line-height: 1.6;
+}
+
+.names dd,
+.glance dd {
+  margin: 0;
+}
+
+/* At a glance */
+.glance {
+  margin: 2rem 0 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 2rem;
+}
+
+.glance > div {
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.glance dd {
+  line-height: 1.4;
+  color: var(--foam);
+}
+
+/* History timeline: a true sequence, so the years lead. */
+.timeline {
+  position: relative;
+  margin-top: 2.5rem;
+  padding-left: 2rem;
+}
+
+.timeline-rail {
+  position: absolute;
+  left: 0;
+  top: 0.6rem;
+  bottom: 0.6rem;
+  width: 2px;
+  background: var(--rule);
+}
+
+.timeline-rail-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(var(--tais-red), var(--sun));
+  transform-origin: top;
+}
+
+.timeline ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2rem;
+}
+
+.timeline li {
+  position: relative;
+}
+
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: calc(-2rem - 4px);
+  top: 0.55rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sea-deep);
+  border: 2px solid var(--sun);
+}
+
+.timeline h3 {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: var(--step-2);
+  line-height: 1.15;
+  color: var(--sun);
+}
+
+.timeline li p {
+  margin: 0;
+}
+
+/* Cristo Rei figures */
+.figures {
+  list-style: none;
+  margin: 2rem 0 2.25rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem 2rem;
+}
+
+.figures li {
+  display: grid;
+  gap: 0.25rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+}
+
+.figures strong {
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  font-size: var(--step-5);
+  line-height: 1;
+  color: var(--sun);
+}
+
+.figures span {
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+blockquote {
+  margin: 2rem 0;
+  padding-left: 1.25rem;
+  border-left: 2px solid var(--tais-red);
+}
+
+blockquote p {
+  font-family: var(--font-display), serif;
+  font-size: var(--step-2);
+  line-height: 1.3;
+  color: var(--foam);
+}
+
+blockquote cite {
+  font-style: normal;
+  font-size: var(--step--1);
+  color: var(--text-soft);
+}
+
+/* Closing: the statue settles at the bottom of the frame below this text. */
+.closing {
+  position: relative;
+  min-height: 130vh;
+  padding: 9vh var(--gutter) 0;
+  text-align: center;
+}
+
+/* By the last section the sun is up and the sky is bright, so the type turns
+   to the deep sea colour instead of fighting the light. */
+.closing h2 {
+  font-size: clamp(var(--step-5), 7vw, 6.5rem);
+  color: var(--sea-deep);
+  text-shadow: 0 1px 30px rgb(255 248 238 / 0.55);
+}
+
+.closing p {
+  margin: 0 auto;
+  max-width: 34rem;
+  font-size: var(--step-1);
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--sea-deep) 92%, transparent);
+  text-shadow: 0 1px 18px rgb(255 248 238 / 0.7);
+}
+
+.closing em {
+  color: var(--tais-red);
+}
+
+/* ---------- Footer ---------- */
+
+.site-footer {
+  position: relative;
+  z-index: 1;
+  background: var(--sea-night);
+}
+
+/* A strip of tais: woven chevrons in the flag's colours. */
+.tais-band {
+  height: 22px;
+  background:
+    linear-gradient(135deg, var(--sun) 25%, transparent 25%) -11px 0 / 22px 22px,
+    linear-gradient(225deg, var(--sun) 25%, transparent 25%) -11px 0 / 22px 22px,
+    linear-gradient(315deg, var(--ink) 25%, transparent 25%) 0 0 / 22px 22px,
+    linear-gradient(45deg, var(--ink) 25%, transparent 25%) 0 0 / 22px 22px,
+    var(--tais-red);
+  border-block: 3px solid var(--ink);
+}
+
+.footer-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 2rem 4rem;
+  align-items: end;
+  padding: clamp(3rem, 8vw, 6rem) var(--gutter) clamp(2.5rem, 5vw, 4rem);
+}
+
+.footer-love {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: clamp(var(--step-3), 4vw, var(--step-5));
+  line-height: 1.1;
+  color: var(--foam);
+}
+
+.footer-name {
+  color: var(--sun);
+  white-space: nowrap;
+}
+
+.footer-sources {
+  font-size: var(--step--1);
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.footer-sources p {
+  margin: 0 0 0.6rem;
+}
+
+/* ---------- Splash ---------- */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #9fcfe3;
+}
+
+.splash-canvas-host {
+  position: absolute;
+  inset: 0;
+}
+
+.splash-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.splash-hud {
+  position: absolute;
+  inset: auto var(--gutter) clamp(1.5rem, 5vh, 3rem);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.5rem;
+  color: #fff;
+  text-shadow: 0 1px 12px rgb(7 26 32 / 0.55);
+}
+
+.splash-route {
+  margin: 0;
+  display: grid;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.splash-route-label {
+  font-size: var(--step--1);
+  opacity: 0.85;
+}
+
+.splash-route-region {
+  font-family: var(--font-display), serif;
+  font-size: clamp(var(--step-3), 4vw, var(--step-5));
+  line-height: 1.05;
+}
+
+.splash-status {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: var(--step--1);
+}
+
+.splash-loading {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.splash-skip {
+  font: inherit;
+  color: #fff;
+  background: rgb(7 26 32 / 0.35);
+  border: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background-color 0.2s;
+}
+
+.splash-skip:hover {
+  background: rgb(7 26 32 / 0.6);
+}
+
+.splash-greeting {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+  color: #fff;
+  text-shadow: 0 2px 28px rgb(7 26 32 / 0.55);
+  background: radial-gradient(ellipse 48% 26% at 50% 50%, rgb(7 26 32 / 0.42), transparent);
+  visibility: hidden;
+  opacity: 0;
+}
+
+.splash-greeting > * {
+  visibility: hidden;
+  opacity: 0;
+  margin: 0;
+}
+
+.splash-greeting-tetum {
+  font-family: var(--font-display), serif;
+  font-size: clamp(2.4rem, 7vw, 6rem);
+  line-height: 1;
+}
+
+.splash-greeting-en {
+  margin-top: 0.9rem !important;
+  font-size: var(--step-1);
+}
+
+.splash-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 45%, #fffaf3, #f6e6d8 70%, #e9d2c4);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 767px) {
+  .chapter,
+  .chapter--right {
+    justify-content: flex-start;
+    padding-inline: 1rem;
+    min-height: 130vh;
+  }
+
+  .chapter-body::before {
+    inset: -3rem -1rem;
+    background: rgb(7 26 32 / 0.62);
+    filter: blur(24px);
+  }
+
+  .glance,
+  .figures {
+    grid-template-columns: 1fr;
+  }
+
+  .names > div {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+
+  .hero {
+    padding-inline: 1rem;
+  }
+
+  .hero-cue {
+    display: none;
+  }
+
+  .footer-inner {
+    grid-template-columns: 1fr;
+    padding-inline: 1rem;
+  }
+
+  .splash-hud {
+    inset-inline: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sunrise-dial {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-cue::after {
+    animation: none;
+  }
 }
