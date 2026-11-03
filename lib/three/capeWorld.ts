@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { createCristoRei } from "./cristoRei";
 import { Water } from "three/addons/objects/Water.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -543,48 +543,9 @@ export class CapeWorld {
     }
   }
 
-  async load(url: string, onProgress: (p: number) => void) {
-    const loader = new GLTFLoader();
-    const gltf = await loader.loadAsync(url, (e) => {
-      if (e.lengthComputable && e.total > 0) onProgress(e.loaded / e.total);
-    });
-    const model = gltf.scene;
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const scale = STATUE_HEIGHT / size.y;
-    model.scale.setScalar(scale);
-    const center = box.getCenter(new THREE.Vector3());
-    model.position.set(-center.x * scale, -box.min.y * scale + PEDESTAL_HEIGHT - 0.02, -center.z * scale);
-
-    model.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      const old = mesh.material as THREE.MeshStandardMaterial;
-      const map = old.map;
-      if (map) {
-        map.colorSpace = THREE.SRGBColorSpace;
-        map.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-      }
-      // Weathered copper: the baked texture becomes the patina colour, and its
-      // brightness doubles as roughness (chalky light patina, polished dark metal).
-      mesh.material = this.track(
-        new THREE.MeshPhysicalMaterial({
-          map,
-          roughnessMap: map,
-          roughness: 1.0,
-          metalness: 0.28,
-          bumpMap: map,
-          bumpScale: 0.6,
-          clearcoat: 0.18,
-          clearcoatRoughness: 0.45,
-          envMapIntensity: 1.5,
-          side: THREE.DoubleSide,
-        }),
-      );
-      old.dispose();
-    });
+  async load(onProgress: (p: number) => void) {
+    const model = await createCristoRei(STATUE_HEIGHT, onProgress);
+    model.position.y = PEDESTAL_HEIGHT - 0.02;
     this.statueRoot.add(model);
     this.loaded = true;
     onProgress(1);
@@ -677,14 +638,8 @@ export class CapeWorld {
 
   dispose() {
     this.stop();
-    this.statueRoot.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (mesh.isMesh) {
-        mesh.geometry.dispose();
-        (mesh.material as THREE.Material).dispose();
-        (mesh.material as THREE.MeshPhysicalMaterial).map?.dispose();
-      }
-    });
+    // The statue's geometry and texture are shared with other scenes (see
+    // cristoRei.ts) and live for the whole page, so only owned resources go.
     for (const d of this.disposables) d.dispose();
     this.skyLight.dispose();
     this.bloom?.dispose();
