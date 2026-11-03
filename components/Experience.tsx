@@ -30,6 +30,7 @@ export default function Experience({ children }: { children: React.ReactNode }) 
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [capeWanted, setCapeWanted] = useState(false);
+  const revealedRef = useRef(false);
 
   // The statue downloads from the first moment, while the intro flies...
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function Experience({ children }: { children: React.ReactNode }) 
     const shots = mobile ? MOBILE_SHOTS : DESKTOP_SHOTS;
     let world: CapeWorld;
     try {
-      world = new CapeWorld(canvas, shots.hero, { quality: detectQuality(), titleFont, reducedMotion });
+      world = new CapeWorld(canvas, shots.hero, { quality: detectQuality(), settings: detectTier(), titleFont, reducedMotion });
     } catch {
       // No WebGL: report it once React has finished this commit.
       queueMicrotask(fail);
@@ -73,6 +74,8 @@ export default function Experience({ children }: { children: React.ReactNode }) 
       };
     }
     worldRef.current = world;
+    // The reveal came first (?intro=0): adopt Dili whenever it is built.
+    if (revealedRef.current) world.attachCity(0);
     world
       .load((p) => !cancelled && setProgress(p))
       .then(() => !cancelled && setReady(true))
@@ -164,9 +167,12 @@ export default function Experience({ children }: { children: React.ReactNode }) 
 
   // The one orchestrated entrance: after the clouds part, the camera glides in
   // from far out over the strait and the greeting rises line by line.
-  const onReveal = useCallback(() => {
+  const onReveal = useCallback(async () => {
+    revealedRef.current = true;
     const world = worldRef.current;
     if (world) {
+      // Behind the veil: adopt the intro's Dili into the home-page scene.
+      await world.attachCity();
       Object.assign(world.current, { theta: -38, radius: 34, height: 10, targetY: 5, offset: 0, sunElev: -0.5, title: 0 });
     }
     setPhase("reveal");
