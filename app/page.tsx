@@ -197,8 +197,10 @@ export default function Home() {
               <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
             </p>
             <p>
-              Intro map: <a href="https://commons.wikimedia.org/wiki/File:East_Timor_map_mhn.jpg">East Timor map</a> by
-              Mats Halldin, public domain, via Wikimedia Commons.
+              Dili&apos;s buildings, roads, lakes and coastline: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, ODbL.
+              Terrain: <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a> (SRTM and bathymetry) on AWS Open Data.
+              The intro map follows the framing of the{" "}
+              <a href="https://commons.wikimedia.org/wiki/File:East_Timor_map_mhn.jpg">East Timor map</a> by Mats Halldin.
             </p>
           </div>
         </div>
