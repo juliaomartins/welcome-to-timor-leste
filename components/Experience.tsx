@@ -6,20 +6,19 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { useGSAP } from "@gsap/react";
 import { CapeWorld } from "@/lib/three/capeWorld";
+import { loadCristoRei } from "@/lib/three/cristoRei";
+import { detectTier } from "@/lib/three/deviceTier";
 import { DESKTOP_SHOTS, MOBILE_SHOTS, mixShots, type ShotId } from "@/lib/shots";
 import SplashFlight from "./SplashFlight";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger, SplitText);
 
-const STATUE_URL = "/Cristo%20Rei%20of%20Dili%20Timor-Leste.glb";
 
 type Phase = "intro" | "reveal" | "site";
 
 function detectQuality(): "high" | "low" {
-  const coarse = window.matchMedia("(pointer: coarse)").matches;
-  const small = window.innerWidth < 768;
-  const cores = navigator.hardwareConcurrency ?? 8;
-  return coarse || small || cores <= 4 ? "low" : "high";
+  // Same device tiering as the intro: only the lowest tier gets the lighter landing scene.
+  return detectTier().tier === "low" ? "low" : "high";
 }
 
 export default function Experience({ children }: { children: React.ReactNode }) {
@@ -30,10 +29,21 @@ export default function Experience({ children }: { children: React.ReactNode }) 
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [capeWanted, setCapeWanted] = useState(false);
 
-  // Build the Cape Fatucama world immediately so the statue downloads while the
-  // splash flight plays.
+  // The statue downloads from the first moment, while the intro flies...
   useEffect(() => {
+    let cancelled = false;
+    loadCristoRei((p) => !cancelled && setProgress(p)).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ...but the Cape Fatucama world is only built when the intro draws its cloud
+  // curtain, so its main-thread cost never interrupts the flight.
+  useEffect(() => {
+    if (!capeWanted) return;
     const host = stageRef.current;
     if (!host) return;
     // A fresh canvas per mount: a disposed renderer leaves its context lost, and
@@ -64,7 +74,7 @@ export default function Experience({ children }: { children: React.ReactNode }) 
     }
     worldRef.current = world;
     world
-      .load(STATUE_URL, (p) => !cancelled && setProgress(p))
+      .load((p) => !cancelled && setProgress(p))
       .then(() => !cancelled && setReady(true))
       .catch(fail);
     const onResize = () => world.resize();
@@ -82,7 +92,8 @@ export default function Experience({ children }: { children: React.ReactNode }) 
       worldRef.current = null;
       canvas.remove();
     };
-  }, []);
+  }, [capeWanted]);
+  const onCurtain = useCallback(() => setCapeWanted(true), []);
 
   // No scrolling while the plane is still in the air.
   useEffect(() => {
@@ -190,6 +201,7 @@ export default function Experience({ children }: { children: React.ReactNode }) 
         <SplashFlight
           progress={progress}
           ready={ready}
+          onCurtain={onCurtain}
           onReveal={onReveal}
           onDone={() => setPhase("site")}
         />
