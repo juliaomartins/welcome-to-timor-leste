@@ -3,11 +3,12 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { CRISTO_REI, TASI_TOLU, toDili } from "../geo";
+import { TASI_TOLU, toDili } from "../geo";
 import { createAirliner, type Airliner } from "./airliner";
 import { createCristoRei } from "./cristoRei";
 import { diliRoutePoints } from "./diliRoute";
-import { assembleDiliCity, fetchDiliCity, type DiliCity, type DiliCityData } from "./diliCity";
+import type { DiliCity } from "./diliCity";
+import { createStatuePlaza, fetchSharedDili, getSharedDili, statueSite } from "./diliShared";
 import type { TierSettings } from "./deviceTier";
 import { FrameGovernor } from "./frameGovernor";
 import { seededRandom } from "./noise";
@@ -77,7 +78,7 @@ export class DiliWorld {
   private running = false;
   private readonly abort = new AbortController();
   private warmTarget: THREE.WebGLRenderTarget | null = null;
-  private pending: { data: DiliCityData; statue: THREE.Group } | null = null;
+  private pending: { statue: THREE.Group } | null = null;
 
   /** The renderer is shared with the island act; this world never disposes it. */
   constructor(renderer: THREE.WebGLRenderer, settings: TierSettings) {
@@ -159,11 +160,9 @@ export class DiliWorld {
 
   /** Stage one, in the background: the worker build and the statue download. */
   async load(onProgress?: (p: number) => void) {
-    const [data, statue] = await Promise.all([
-      fetchDiliCity({ settings: this.settings, onProgress, signal: this.abort.signal }),
-      createCristoRei(STATUE_HEIGHT),
-    ]);
-    this.pending = { data, statue };
+    // The city is shared with the home page (diliShared.ts): one worker build per visit.
+    const [, statue] = await Promise.all([fetchSharedDili(this.settings, onProgress), createCristoRei(STATUE_HEIGHT)]);
+    this.pending = { statue };
   }
 
   /**
@@ -172,25 +171,19 @@ export class DiliWorld {
    */
   async assemble() {
     if (!this.pending || this.abort.signal.aborted) return;
-    const { data, statue } = this.pending;
+    const { statue } = this.pending;
     this.pending = null;
-    const city = assembleDiliCity(data, this.settings);
+    const city = await getSharedDili(this.settings);
     this.city = city;
     this.scene.add(city.group);
 
     // Cristo Rei at the Google Maps pin, on the summit of Cape Fatucama, facing west.
-    const [sx, sz] = toDili(CRISTO_REI);
-    let top = -Infinity;
-    for (let a = 0; a < 12; a++) {
-      for (const r of [0, 6, 12]) top = Math.max(top, city.heightAt(sx + Math.cos(a) * r, sz + Math.sin(a) * r));
-    }
-    const plaza = new THREE.Mesh(
-      this.track(new THREE.CylinderGeometry(7.5, 9, 3, 32)),
-      this.track(new THREE.MeshStandardMaterial({ color: "#a59c8d", roughness: 0.9 })),
-    );
+    const site = statueSite(city);
+    const [sx, sz, top] = [site.x, site.z, site.y];
+    const plaza = createStatuePlaza();
+    this.track(plaza.geometry);
+    this.track(plaza.material as THREE.Material);
     plaza.position.set(sx, top - 1.2, sz);
-    plaza.receiveShadow = true;
-    plaza.castShadow = true;
     statue.position.set(sx, top + 0.2, sz);
     statue.rotation.y = -Math.PI / 2; // model faces +Z; west is -X
     this.scene.add(plaza, statue);
@@ -360,7 +353,8 @@ export class DiliWorld {
   dispose() {
     this.stop();
     this.abort.abort();
-    this.city?.dispose();
+    // The city is shared with the home page: hand it back rather than destroy it.
+    if (this.city && this.city.group.parent === this.scene) this.scene.remove(this.city.group);
     for (const d of this.disposables) d.dispose();
     this.skyLight.dispose();
     this.composer.dispose();
