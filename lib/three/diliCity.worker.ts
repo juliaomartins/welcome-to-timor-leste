@@ -478,13 +478,19 @@ async function build(settings: TierSettings, progress: (p: number) => void, bake
   const trees = new Float32Array(maxTrees * 19);
   const leaf = new Color();
   let placed = 0;
+  // The summit itself is a paved plaza on open, grassy ground: clear around the
+  // statue and sparse out to the edge of the hilltop, where the home page's camera stands.
+  const summitClear = (x: number, z: number) => {
+    const d = Math.hypot(x - crX, z - crZ);
+    return d < 40 || (d < 130 && rand() > 0.25);
+  };
   // Cape Fatucama first: a dense green cover around the statue, as in the references.
   for (let tries = 0; placed < capeTrees && tries < capeTrees * 8; tries++) {
     const a = rand() * Math.PI * 2;
     const r = 28 + Math.sqrt(rand()) * 1050;
     const x = crX + 260 + Math.cos(a) * r;
     const z = crZ + 240 + Math.sin(a) * r;
-    if (field.sea(x, z) || !free(x, z) || field.raw(x, z) < 2) continue;
+    if (field.sea(x, z) || !free(x, z) || field.raw(x, z) < 2 || summitClear(x, z)) continue;
     const size = 6 + rand() * 7;
     compose(trees, placed * 19, x, heightAt(x, z) - 0.4, z, rand() * Math.PI * 2, size, size * 0.9, size);
     leaf.setHSL(0.24 + rand() * 0.07, 0.42 + rand() * 0.2, 0.16 + rand() * 0.1, SRGBColorSpace);
@@ -494,7 +500,7 @@ async function build(settings: TierSettings, progress: (p: number) => void, bake
   for (let tries = 0; placed < maxTrees && tries < maxTrees * 10; tries++) {
     const x = NEAR.xW + rand() * nearW;
     const z = NEAR.zN + rand() * nearD;
-    if (field.sea(x, z) || lakeAt(x, z) || inPalace(x, z, 4) || nearStatue(x, z, 25) || !free(x, z)) continue;
+    if (field.sea(x, z) || lakeAt(x, z) || inPalace(x, z, 4) || summitClear(x, z) || !free(x, z)) continue;
     const h = field.raw(x, z);
     const urban = inUrban(x, z);
     // Cape Fatucama is densely wooded (see the Cristo Rei references).
