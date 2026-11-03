@@ -18,7 +18,8 @@ type Props = {
   ready: boolean;
   /** The screen is covered by the cloud veil: a good moment for heavy main-thread work. */
   onCurtain: () => void;
-  onReveal: () => void;
+  /** The veil is opaque: swap in the site. The veil lifts once this settles. */
+  onReveal: () => void | Promise<void>;
   onDone: () => void;
 };
 
@@ -286,17 +287,28 @@ export default function SplashFlight({ progress, ready, onCurtain, onReveal, onD
     leaving.current = true;
     timeline.current?.pause();
     const q = gsap.utils.selector(rootRef);
-    gsap
-      .timeline({ delay: hold })
-      .to(q(".splash-veil"), { autoAlpha: 1, duration: 0.9, ease: "power1.in" })
-      .add(() => {
+    gsap.to(q(".splash-veil"), {
+      autoAlpha: 1,
+      duration: 0.9,
+      delay: hold,
+      ease: "power1.in",
+      onComplete: async () => {
         islandRef.current?.stop();
         diliRef.current?.stop();
         gsap.set(q(".splash-canvas-host, .splash-hud, .splash-greeting"), { autoAlpha: 0 });
-        callbacks.current.onReveal();
-      })
-      .to(q(".splash-veil"), { autoAlpha: 0, duration: 1.6, ease: "power2.out" }, "+=0.15")
-      .add(() => callbacks.current.onDone());
+        // Release the shared city from the intro so the home page can adopt it.
+        diliRef.current?.dispose();
+        diliRef.current = null;
+        await callbacks.current.onReveal();
+        gsap.to(q(".splash-veil"), {
+          autoAlpha: 0,
+          duration: 1.6,
+          delay: 0.15,
+          ease: "power2.out",
+          onComplete: () => callbacks.current.onDone(),
+        });
+      },
+    });
   }
 
   const onSkip = () => {
