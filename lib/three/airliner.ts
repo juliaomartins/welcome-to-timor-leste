@@ -192,6 +192,8 @@ export function createAirliner(): Airliner {
     new THREE.MeshPhysicalMaterial({ color: "#eef0f2", roughness: 0.25, metalness: 0.35, clearcoat: 1 }),
   );
   const darkMetal = track(new THREE.MeshStandardMaterial({ color: "#2a2f35", roughness: 0.35, metalness: 0.9 }));
+  const brightMetal = track(new THREE.MeshStandardMaterial({ color: "#e8ebee", roughness: 0.12, metalness: 1 }));
+  const bellyPaint = track(new THREE.MeshPhysicalMaterial({ color: "#c9ccd1", roughness: 0.32, metalness: 0.08, clearcoat: 1 }));
   const flagTex = track(flagTexture());
   const tailPaint = track(
     new THREE.MeshPhysicalMaterial({ map: flagTex, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08 }),
@@ -259,6 +261,27 @@ export function createAirliner(): Airliner {
     spinner.position.set(side * 0.78, -0.27, 0.77);
     group.add(spinner);
 
+    // Polished intake lip and the dark core exhaust behind the fan cowl.
+    const lipGeo = track(new THREE.TorusGeometry(0.112, 0.014, 8, 32));
+    const lip = new THREE.Mesh(lipGeo, brightMetal);
+    lip.position.set(side * 0.78, -0.27, 0.73);
+    group.add(lip);
+    const exhaustGeo = track(new THREE.ConeGeometry(0.07, 0.16, 18, 1, true));
+    exhaustGeo.rotateX(-Math.PI / 2);
+    const exhaust = new THREE.Mesh(exhaustGeo, darkMetal);
+    exhaust.position.set(side * 0.78, -0.27, 0.0);
+    group.add(exhaust);
+
+    // Flap-track fairings: slim canoes under the trailing edge.
+    const canoeGeo = track(new THREE.SphereGeometry(0.03, 10, 8));
+    canoeGeo.scale(1, 1, 6);
+    for (const span of [0.55, 1.15, 1.6]) {
+      const canoe = new THREE.Mesh(canoeGeo, wingMetal);
+      const back = -0.45 - span * 0.42;
+      canoe.position.set(side * span, -0.16 + span * 0.07 * 0.5, back);
+      group.add(canoe);
+    }
+
     const pylonGeo = track(new THREE.BoxGeometry(0.03, 0.12, 0.4));
     const pylon = new THREE.Mesh(pylonGeo, wingMetal);
     pylon.position.set(side * 0.78, -0.16, 0.36);
@@ -284,6 +307,19 @@ export function createAirliner(): Airliner {
     stab.rotation.z = side * 0.1;
     group.add(stab);
   }
+
+  // Wing-to-body fairing: the smooth belly blister where the wings join.
+  const fairingGeo = track(new THREE.SphereGeometry(1, 32, 16));
+  fairingGeo.scale(0.25, 0.11, 0.95);
+  const fairing = new THREE.Mesh(fairingGeo, bellyPaint);
+  fairing.position.set(0, -0.15, -0.05);
+  group.add(fairing);
+  // APU exhaust at the tip of the tail cone.
+  const apuGeo = track(new THREE.CylinderGeometry(0.03, 0.035, 0.05, 14));
+  apuGeo.rotateX(Math.PI / 2);
+  const apu = new THREE.Mesh(apuGeo, darkMetal);
+  apu.position.set(0, 0, -2.0);
+  group.add(apu);
 
   // Vertical fin with the flag. ExtrudeGeometry UVs equal the shape coordinates,
   // so the texture is remapped to the fin's bounding box.
