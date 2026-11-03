@@ -5,7 +5,10 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { createAirliner, type Airliner } from "./airliner";
 import { buildMapTerrain, mapToWorld, MAP_DEPTH, MAP_WIDTH, SEA_COLOR, type MapTerrain } from "./mapTerrain";
+import { GOVERNMENT_PALACE, islandUV } from "../geo";
 import { seededRandom } from "./noise";
+import { loadRelief } from "./relief";
+import type { TierSettings } from "./deviceTier";
 import { FrameGovernor } from "./frameGovernor";
 import { SkyLight } from "./skyLight";
 import { createWaterNormals } from "./waterNormals";
@@ -20,18 +23,18 @@ export type FlightState = {
   dive: number; // 0..1 final push down into the clouds
 };
 
-// Route in map-image UV (0..1 from the top-left) with altitude in world units.
+// Route as real longitude, latitude and altitude (world units): over the Savu
+// Sea, up the Ombai Strait, along the north coast and down toward Dili.
 const ROUTE: [number, number, number][] = [
-  [0.0, 0.84, 3.4],
-  [0.16, 0.66, 2.9],
-  [0.33, 0.52, 2.3],
-  [0.46, 0.43, 1.85],
-  [0.555, 0.36, 1.5],
-  [0.61, 0.322, 1.3],
-  [0.69, 0.285, 1.25],
-  [0.8, 0.25, 1.4],
+  [122.55, -10.45, 3.4],
+  [123.35, -9.8, 2.9],
+  [124.15, -9.15, 2.3],
+  [124.85, -8.85, 1.9],
+  [125.3, -8.62, 1.5],
+  [125.58, -8.54, 1.1],
+  [125.75, -8.47, 0.9],
 ];
-export const DILI_UV: [number, number] = [0.609, 0.33];
+export const DILI_UV = islandUV(GOVERNMENT_PALACE);
 const PLANE_SCALE = 0.1;
 
 function cloudTexture(seed: number): THREE.CanvasTexture {
@@ -86,16 +89,13 @@ export class FlightWorld {
   private bank = 0;
   private initialised = false;
 
-  constructor(canvas: HTMLCanvasElement, quality: "high" | "low") {
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
-    const maxRatio = Math.min(window.devicePixelRatio, quality === "high" ? 1.75 : 1.25);
-    renderer.setPixelRatio(maxRatio);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.42;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+  private readonly settings: TierSettings;
+
+  /** The renderer is shared with the Dili act; this world never disposes it. */
+  constructor(renderer: THREE.WebGLRenderer, settings: TierSettings) {
     this.renderer = renderer;
+    this.settings = settings;
+    const maxRatio = Math.min(window.devicePixelRatio, settings.maxPixelRatio);
 
     // Morning sun from the north-west, matching the hill-shading baked into the map.
     this.skyLight = new SkyLight(renderer, {
@@ -113,8 +113,8 @@ export class FlightWorld {
 
     this.sun = new THREE.DirectionalLight("#fff1de", 1.55);
     this.sun.position.copy(this.skyLight.sunDirection).multiplyScalar(40);
-    this.sun.castShadow = true;
-    const sm = quality === "high" ? 2048 : 1024;
+    this.sun.castShadow = settings.shadowMap > 0;
+    const sm = Math.max(512, settings.shadowMap);
     this.sun.shadow.mapSize.set(sm, sm);
     const sc = this.sun.shadow.camera;
     sc.left = -20;
@@ -130,7 +130,7 @@ export class FlightWorld {
 
     // Open sea around (and as a glossy film over) the map.
     this.seaNormal = this.track(createWaterNormals(256, 3));
-    this.seaNormal.repeat.set(60, 60);
+    this.seaNormal.repeat.set(420, 420);
     this.seaMat = this.track(
       new THREE.MeshStandardMaterial({
         color: SEA_COLOR.clone().multiplyScalar(0.55),
@@ -139,7 +139,7 @@ export class FlightWorld {
         transparent: true,
         opacity: 0.16,
         normalMap: this.seaNormal,
-        normalScale: new THREE.Vector2(0.35, 0.35),
+        normalScale: new THREE.Vector2(0.18, 0.18),
         envMapIntensity: 0.45,
       }),
     );
@@ -155,22 +155,22 @@ export class FlightWorld {
     this.scene.add(seaFloor, seaFilm);
 
     this.route = new THREE.CatmullRomCurve3(
-      ROUTE.map(([u, v, y]) => mapToWorld(u, v, y)),
+      ROUTE.map(([lon, lat, y]) => mapToWorld(...islandUV({ lon, lat }), y)),
       false,
       "centripetal",
     );
 
-    this.buildClouds(quality === "high" ? 36 : 22);
+    this.buildClouds(settings.islandClouds);
     this.buildMarker();
 
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, {
       type: THREE.HalfFloatType,
-      samples: quality === "high" ? 4 : 0,
+      samples: settings.msaa,
     });
     this.composer = new EffectComposer(renderer, rt);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    if (quality === "high") {
+    if (settings.bloom) {
       // Threshold is in scene-linear HDR, before exposure: the physical sky itself
       // sits well above 1, so only the sun, glints and the Dili beacon may bloom.
       this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.3, 0.45, 6));
@@ -185,18 +185,17 @@ export class FlightWorld {
     return o;
   }
 
-  async load(mapUrl: string) {
-    const img = new Image();
-    img.decoding = "async";
-    img.src = mapUrl;
-    await img.decode();
-    this.terrain = buildMapTerrain(img, 380);
+  async load(reliefUrl: string) {
+    const relief = await loadRelief(reliefUrl);
+    this.terrain = buildMapTerrain(relief, this.settings.islandSegments);
     this.scene.add(this.terrain.mesh);
     this.plane = createAirliner();
     this.plane.group.scale.setScalar(PLANE_SCALE);
     this.scene.add(this.plane.group);
     const [u, v] = DILI_UV;
     this.marker.position.copy(mapToWorld(u, v, this.terrain.heightAt(u, v) + 0.01));
+    // Compile shaders before the first visible frame, so the flight starts without a hitch.
+    await this.renderer.compileAsync(this.scene, this.camera);
     this.initialised = true;
   }
 
@@ -288,8 +287,8 @@ export class FlightWorld {
 
   private regionFor(p: number) {
     if (p < 0.3) return "Savu Sea";
-    if (p < 0.55) return "Ombai Strait";
-    if (p < 0.74) return "North coast of Timor";
+    if (p < 0.6) return "Ombai Strait";
+    if (p < 0.8) return "North coast of Timor";
     return "Dili";
   }
 
@@ -335,13 +334,13 @@ export class FlightWorld {
     this.camera.lookAt(this.camLook);
 
     // Dili beacon.
-    this.marker.visible = p > 0.55;
+    this.marker.visible = p > 0.55 && st.dive < 0.15;
     // The beam only rises once we arrive, so it never looms past the chase camera.
     if (this.beamMat) this.beamMat.opacity = 0.55 * st.arrive;
     this.marker.children.forEach((child) => {
       if (!(child instanceof THREE.Mesh) || child.userData.phase === undefined) return;
       const t = (time * 0.6 + child.userData.phase) % 1;
-      child.scale.setScalar(0.6 + t * 2.4);
+      child.scale.setScalar(0.4 + t * 1.2);
       (child.material as THREE.MeshBasicMaterial).opacity = (1 - t) * 0.9;
     });
 
@@ -360,6 +359,10 @@ export class FlightWorld {
   start() {
     if (this.running) return;
     this.running = true;
+    // Shared renderer: claim its global state for this act.
+    this.renderer.toneMappingExposure = 0.42;
+    this.renderer.shadowMap.enabled = this.settings.shadowMap > 0;
+    this.resize();
     this.clock.reset();
     const loop = (ts: number) => {
       if (!this.running) return;
@@ -384,7 +387,5 @@ export class FlightWorld {
     for (const d of this.disposables) d.dispose();
     this.skyLight.dispose();
     this.composer.dispose();
-    this.renderer.dispose();
-    this.renderer.forceContextLoss();
   }
 }
