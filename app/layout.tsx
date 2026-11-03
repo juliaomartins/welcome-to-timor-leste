@@ -27,8 +27,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body>{children}</body>
+    // is-intro is in the server HTML so scrolling is locked from the first paint,
+    // not only once the intro script has loaded; without JavaScript, the noscript
+    // rules unlock the page and hide the intro overlay so the content stays readable.
+    <html lang="en" className={`${display.variable} ${body.variable} is-intro`}>
+      <body>
+        <noscript>
+          <style>{"html.is-intro, html.is-intro body { overflow: auto; } .splash { display: none; }"}</style>
+        </noscript>
+        {children}
+      </body>
     </html>
   );
 }
